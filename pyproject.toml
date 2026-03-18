@@ -12,7 +12,7 @@ dependencies = []
 
 [project.optional-dependencies]
 inference = ["ultralytics>=8.3.0", "pillow>=10.4.0"]
-synthetic = ["pillow>=10.4.0"]
+synthetic = ["pillow>=10.4.0", "qrcode[pil]>=7.4.2"]
 dev = ["pytest>=8.3.0"]
 
 [project.scripts]

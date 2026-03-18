@@ -207,3 +207,10 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python,macos
+
+
+/auto_generated_test_images
+/runs
+/dataset_demo
+/train_out
+images.csv

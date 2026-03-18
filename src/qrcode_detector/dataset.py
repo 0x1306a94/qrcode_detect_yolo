@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import random
 import shutil
 from dataclasses import dataclass
@@ -108,17 +107,7 @@ def export_yolo_dataset(records_by_split: dict[str, list[ManifestRecord]], outpu
             label_path = label_dir / f"{record.image_path.stem}.txt"
             label_path.write_text(_build_yolo_label_content(record), encoding="utf-8")
 
-    dataset_config = {
-        "path": str(output_root.resolve()),
-        "train": "images/train",
-        "val": "images/val",
-        "test": "images/test",
-        "names": {0: "qrcode"},
-    }
-    (output_root / "dataset.json").write_text(
-        json.dumps(dataset_config, indent=2, ensure_ascii=True),
-        encoding="utf-8",
-    )
+    _write_dataset_yaml(output_root)
 
 
 def _build_yolo_label_content(record: ManifestRecord) -> str:
@@ -143,3 +132,16 @@ def _build_yolo_label_content(record: ManifestRecord) -> str:
         box_height = (y2 - y1) / height
         labels.append(f"0 {center_x:.6f} {center_y:.6f} {box_width:.6f} {box_height:.6f}")
     return "\n".join(labels) + "\n"
+
+
+def _write_dataset_yaml(output_root: Path) -> None:
+    dataset_yaml = "\n".join([
+        f"path: {output_root.resolve()}",
+        "train: images/train",
+        "val: images/val",
+        "test: images/test",
+        "names:",
+        "  0: qrcode",
+        "",
+    ])
+    (output_root / "dataset.yaml").write_text(dataset_yaml, encoding="utf-8")
