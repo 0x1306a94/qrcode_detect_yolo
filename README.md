@@ -145,10 +145,10 @@ python3 src/qrcode_detector/cli.py export-labelme-dataset \
 yolo detect train \
   data=./dataset_demo/dataset.yaml \
   model=train_out/yolov8n.pt \
-  imgsz=1024 \
+  imgsz=512 \
   epochs=20 \
   batch=4 \
-  device=cpu
+  device=mps
 
 # Apple Silicon MPS
 device=mps
@@ -255,3 +255,122 @@ dataset/
 4. 只生成少量合成样本作为增强，不把它当主数据集。
 5. 导出 YOLO 数据集。
 6. 训练轻量 YOLO 模型，并按高召回目标校准阈值。
+
+## 导出 CoreML
+
+```bash
+yolo export model=./runs/detect/train/weights/best.pt format=coreml imgsz=512 nms=True
+```
+
+```swift
+import AppKit
+import CoreGraphics
+import CoreML
+import Foundation
+import QuartzCore
+
+struct Detection {
+    let score: Float
+    let rect: CGRect
+}
+
+private func multiArrayValue(
+    _ array: MLMultiArray,
+    _ i: Int,
+    _ j: Int
+) -> Float {
+    let index: [NSNumber] = [NSNumber(value: i), NSNumber(value: j)]
+    return array[index].floatValue
+}
+
+func parseDetections(
+    output: qrcode_detect_yoloOutput,
+    imageWidth: CGFloat,
+    imageHeight: CGFloat,
+    confidenceThreshold: Float = 0.25
+) -> [Detection] {
+    let confidence = output.confidence
+    let coordinates = output.coordinates
+
+    let boxCount = confidence.shape[0].intValue
+    var detections: [Detection] = []
+
+    for boxIndex in 0 ..< boxCount {
+        let score = multiArrayValue(confidence, boxIndex, 0)
+        if score < confidenceThreshold {
+            continue
+        }
+
+        let centerX = CGFloat(multiArrayValue(coordinates, boxIndex, 0)) * imageWidth
+        let centerY = CGFloat(multiArrayValue(coordinates, boxIndex, 1)) * imageHeight
+        let width = CGFloat(multiArrayValue(coordinates, boxIndex, 2)) * imageWidth
+        let height = CGFloat(multiArrayValue(coordinates, boxIndex, 3)) * imageHeight
+
+        let rect = CGRect(
+            x: centerX - width / 2,
+            y: centerY - height / 2,
+            width: width,
+            height: height
+        )
+
+        detections.append(
+            Detection(
+                score: score,
+                rect: rect
+            )
+        )
+    }
+
+    return detections
+}
+
+let t0 = CACurrentMediaTime()
+var start = CACurrentMediaTime()
+let model = try qrcode_detect_yolo()
+print("load model elapsed time: \(Int((CACurrentMediaTime() - start) * 1000.0))ms")
+
+start = CACurrentMediaTime()
+guard let image = NSImage(contentsOf: URL(fileURLWithPath: "/Users/xx/Desktop/iShot_2026-03-19_08.33.05.png")), let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+    exit(EXIT_FAILURE)
+}
+print("load image elapsed time: \(Int((CACurrentMediaTime() - start) * 1000.0))ms")
+
+let input = try qrcode_detect_yoloInput(imageWith: cgImage, iouThreshold: 0.7, confidenceThreshold: 0.25)
+
+start = CACurrentMediaTime()
+let result = try model.prediction(input: input)
+print("prediction elapsed time: \(Int((CACurrentMediaTime() - start) * 1000.0))ms")
+print("total elapsed time: \(Int((CACurrentMediaTime() - t0) * 1000.0))ms")
+
+print("confidence shape:", result.confidence.shape)
+print("coordinates shape:", result.coordinates.shape)
+
+let detections = parseDetections(
+    output: result,
+    imageWidth: image.size.width,
+    imageHeight: image.size.height,
+    confidenceThreshold: 0.25
+)
+
+for detection in detections {
+    print("label=qrcode, score=\(detection.score), rect=\(detection.rect)")
+}
+
+// output，Apple M1 iMac
+load model elapsed time: 56ms
+load image elapsed time: 55ms
+prediction elapsed time: 3ms
+total elapsed time: 256ms
+confidence shape: [9, 80]
+coordinates shape: [9, 4]
+label=qrcode, score=0.9501953, rect=(675.938720703125, 54.2791748046875, 257.40966796875, 246.221923828125)
+label=qrcode, score=0.93066406, rect=(356.6553955078125, 756.73583984375, 296.497802734375, 294.0869140625)
+label=qrcode, score=0.92871094, rect=(1314.1240234375, 87.177734375, 193.724609375, 182.90771484375)
+label=qrcode, score=0.92578125, rect=(756.784423828125, 455.2001953125, 98.76904296875, 95.4541015625)
+label=qrcode, score=0.9111328, rect=(350.7445068359375, 24.415283203125, 308.319580078125, 299.88037109375)
+label=qrcode, score=0.9042969, rect=(159.8800048828125, 212.978515625, 85.231201171875, 75.31494140625)
+label=qrcode, score=0.8203125, rect=(174.3712158203125, 987.0947265625, 58.155517578125, 49.658203125)
+label=qrcode, score=0.7675781, rect=(174.847900390625, 921.435546875, 58.34619140625, 48.5546875)
+label=qrcode, score=0.31347656, rect=(988.07177734375, 421.956787109375, 260.0791015625, 220.97900390625)
+```
+
