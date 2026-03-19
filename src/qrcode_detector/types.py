@@ -29,4 +29,8 @@ class BoundingBox:
 class DetectionResult:
     has_qrcode: bool
     score: float
+    elapsed_ms: float
+    read_elapsed_ms: float
+    predict_elapsed_ms: float
+    postprocess_elapsed_ms: float
     boxes: tuple[BoundingBox, ...] = field(default_factory=tuple)

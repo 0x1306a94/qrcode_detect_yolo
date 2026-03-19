@@ -33,6 +33,15 @@ def build_parser() -> argparse.ArgumentParser:
     detect_parser = subparsers.add_parser("detect", help="Run QR code detection on one image.")
     detect_parser.add_argument("--model", required=True, help="Path to a YOLO model weights file.")
     detect_parser.add_argument("--image", required=True, help="Path to the input image.")
+    detect_parser.add_argument(
+        "--output",
+        help="Save the image with drawn bounding boxes, labels and scores to this path.",
+    )
+    detect_parser.add_argument(
+        "--show",
+        action="store_true",
+        help="Display the annotated image in the default system image viewer.",
+    )
 
     synthesize_parser = subparsers.add_parser("synthesize", help="Paste one QR code onto a background image.")
     synthesize_parser.add_argument("--background", required=True, help="Path to a poster image.")
@@ -140,12 +149,25 @@ def main() -> None:
 
     if arguments.command == "detect":
         detector = QRCodeDetector(model_path=arguments.model)
-        result = detector.detect(arguments.image)
+        draw_on_image = arguments.output is not None or arguments.show
+        out = detector.detect(
+            arguments.image,
+            draw_on_image=draw_on_image,
+            output_path=arguments.output,
+            show=arguments.show,
+        )
+        result = out[0] if isinstance(out, tuple) else out
         print(json.dumps({
             "has_qrcode": result.has_qrcode,
             "score": result.score,
+            "elapsed_ms": result.elapsed_ms,
+            "read_elapsed_ms": result.read_elapsed_ms,
+            "predict_elapsed_ms": result.predict_elapsed_ms,
+            "postprocess_elapsed_ms": result.postprocess_elapsed_ms,
             "boxes": [asdict(box) for box in result.boxes],
         }, ensure_ascii=True, indent=2))
+        if isinstance(out, tuple) and result.boxes:
+            print(f"Visualization saved to: {arguments.output}", file=sys.stderr)
         return
 
     if arguments.command == "synthesize":
