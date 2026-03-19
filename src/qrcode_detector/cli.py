@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import argparse
 import json
 import sys
@@ -13,7 +14,7 @@ if __package__ in {None, ""}:
     from qrcode_detector.dataset import export_yolo_dataset, load_manifest, split_records
     from qrcode_detector.detector import QRCodeDetector
     from qrcode_detector.source_split import SourceSplitConfig, split_training_sources
-    from qrcode_detector.synthetic import compose_synthetic_qrcode, synthesize_directory
+    from qrcode_detector.synthetic import SyntheticQRCodeConfig, compose_synthetic_qrcode, synthesize_directory
 else:
     from .dataset_build import build_dataset_from_splits
     from .download import download_images_from_csv
@@ -21,7 +22,7 @@ else:
     from .detector import QRCodeDetector
     from .labelme import export_labelme_directory_to_yolo
     from .source_split import SourceSplitConfig, split_training_sources
-    from .synthetic import compose_synthetic_qrcode, synthesize_directory
+    from .synthetic import SyntheticQRCodeConfig, compose_synthetic_qrcode, synthesize_directory
 if __package__ in {None, ""}:
     from qrcode_detector.labelme import export_labelme_directory_to_yolo
 
@@ -57,6 +58,12 @@ def build_parser() -> argparse.ArgumentParser:
     synthesize_dir_parser.add_argument("--output-dir", required=True, help="Directory for generated synthetic images.")
     synthesize_dir_parser.add_argument("--seed", type=int, default=None, help="Optional random seed.")
     synthesize_dir_parser.add_argument("--recursive", action="store_true", help="Traverse subdirectories recursively.")
+    synthesize_dir_parser.add_argument(
+        "--variants-per-image",
+        type=int,
+        default=1,
+        help="How many synthetic variants to generate for each source image.",
+    )
     synthesize_dir_parser.add_argument(
         "--write-labelme-json",
         action="store_true",
@@ -181,17 +188,21 @@ def main() -> None:
         return
 
     if arguments.command == "synthesize-directory":
+        total_start_time = time.perf_counter()
         results = synthesize_directory(
             input_dir=arguments.input_dir,
             output_dir=arguments.output_dir,
             seed=arguments.seed,
             recursive=arguments.recursive,
             write_labelme_json=arguments.write_labelme_json,
+            config=SyntheticQRCodeConfig(variants_per_image=arguments.variants_per_image),
         )
-        print(json.dumps({
-            "count": len(results),
-            "items": results,
-        }, ensure_ascii=True, indent=2))
+        elapsed_ms = (time.perf_counter() - total_start_time) * 1000.0
+        print(f"Synthesize directory elapsed time: {elapsed_ms:.2f}ms")
+        # print(json.dumps({
+        #     "count": len(results),
+        #     "items": results,
+        # }, ensure_ascii=True, indent=2))
         return
 
     if arguments.command == "export-dataset":
@@ -243,12 +254,15 @@ def main() -> None:
         return
 
     if arguments.command == "build-dataset-from-splits":
+        total_start_time = time.perf_counter()
         summary = build_dataset_from_splits(
             splits_dir=arguments.splits_dir,
             processed_dir=arguments.processed_dir,
             output_dir=arguments.output_dir,
         )
-        print(json.dumps(summary, ensure_ascii=True, indent=2))
+        # print(json.dumps(summary, ensure_ascii=True, indent=2))
+        elapsed_ms = (time.perf_counter() - total_start_time) * 1000.0
+        print(f"Build dataset from splits elapsed time: {elapsed_ms:.2f}ms")
         return
 
     raise RuntimeError(f"Unsupported command: {arguments.command}")

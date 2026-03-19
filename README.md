@@ -93,13 +93,14 @@ qrcode-detect detect \
   --image /abs/path/to/input.jpg
 ```
 
-批量遍历目录，为每张图生成一个合成二维码样本，并写出 Labelme 标注：
+批量遍历目录，为每张图生成一个或多个合成二维码样本，并写出 Labelme 标注：
 
 ```bash
 qrcode-detect synthesize-directory \
   --input-dir /abs/path/to/source_images \
   --output-dir /abs/path/to/synthetic_images \
   --recursive \
+  --variants-per-image 2 \
   --write-labelme-json
 ```
 
@@ -113,6 +114,10 @@ qrcode-detect synthesize-directory \
 
 - 如果二维码是程序贴上去的，原则上不需要再人工框选，因为矩形框已知，自动生成标注更准确。
 - 如果你想人工复核，直接用 Labelme 打开自动生成的 JSON 修改即可。
+- 默认会混合小码、中码和大码，并随机使用不同二维码容错率与不同内容长度。
+- 当前内容会混合短链接、带查询参数的链接、小程序路径风格字符串和普通活动口令样式字符串。
+- 默认位置会覆盖左下、右下、左上、右上和中部区域，其中左下和右下权重更高。
+- 默认关闭彩色二维码和透明度扰动，避免生成带淡绿色或淡紫色覆盖层的非真实样式。
 
 ## 最小跑通流程
 
@@ -122,6 +127,7 @@ qrcode-detect synthesize-directory \
 python3 src/qrcode_detector/cli.py synthesize-directory \
   --input-dir ./auto_generated_test_images/origins \
   --output-dir ./auto_generated_test_images/synthesizes \
+  --variants-per-image 2 \
   --write-labelme-json
 ```
 
@@ -139,7 +145,7 @@ python3 src/qrcode_detector/cli.py export-labelme-dataset \
 yolo detect train \
   data=./dataset_demo/dataset.yaml \
   model=train_out/yolov8n.pt \
-  imgsz=640 \
+  imgsz=1024 \
   epochs=20 \
   batch=4 \
   device=cpu
