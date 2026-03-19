@@ -9,6 +9,7 @@ from pathlib import Path
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from qrcode_detector.config import DetectionConfig
     from qrcode_detector.dataset_build import build_dataset_from_splits
     from qrcode_detector.download import download_images_from_csv
     from qrcode_detector.dataset import export_yolo_dataset, load_manifest, split_records
@@ -16,6 +17,7 @@ if __package__ in {None, ""}:
     from qrcode_detector.source_split import SourceSplitConfig, split_training_sources
     from qrcode_detector.synthetic import SyntheticQRCodeConfig, compose_synthetic_qrcode, synthesize_directory
 else:
+    from .config import DetectionConfig
     from .dataset_build import build_dataset_from_splits
     from .download import download_images_from_csv
     from .dataset import export_yolo_dataset, load_manifest, split_records
@@ -34,6 +36,12 @@ def build_parser() -> argparse.ArgumentParser:
     detect_parser = subparsers.add_parser("detect", help="Run QR code detection on one image.")
     detect_parser.add_argument("--model", required=True, help="Path to a YOLO model weights file.")
     detect_parser.add_argument("--image", required=True, help="Path to the input image.")
+    detect_parser.add_argument(
+        "--imgsz",
+        type=int,
+        default=None,
+        help="Inference image size. If omitted, uses DetectionConfig.target_size.",
+    )
     detect_parser.add_argument(
         "--output",
         help="Save the image with drawn bounding boxes, labels and scores to this path.",
@@ -155,7 +163,10 @@ def main() -> None:
     arguments = parser.parse_args()
 
     if arguments.command == "detect":
-        detector = QRCodeDetector(model_path=arguments.model)
+        detection_config = DetectionConfig(
+            target_size=arguments.imgsz if arguments.imgsz is not None else DetectionConfig().target_size,
+        )
+        detector = QRCodeDetector(model_path=arguments.model, config=detection_config)
         draw_on_image = arguments.output is not None or arguments.show
         out = detector.detect(
             arguments.image,
