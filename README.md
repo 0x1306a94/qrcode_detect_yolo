@@ -424,3 +424,78 @@ label=qrcode, score=0.8203125, rect=(174.3712158203125, 987.0947265625, 58.15551
 label=qrcode, score=0.7675781, rect=(174.847900390625, 921.435546875, 58.34619140625, 48.5546875)
 label=qrcode, score=0.31347656, rect=(988.07177734375, 421.956787109375, 260.0791015625, 220.97900390625)
 ```
+
+## Vision
+
+```swift
+import AppKit
+import CoreGraphics
+import CoreML
+import Foundation
+import QuartzCore
+import Vision
+
+let t0 = CACurrentMediaTime()
+var start = CACurrentMediaTime()
+
+start = CACurrentMediaTime()
+guard let image = NSImage(contentsOf: URL(fileURLWithPath: "/Users/xxx/Desktop/iShot_2026-03-19_08.33.05.png")), let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+    exit(EXIT_FAILURE)
+}
+
+print("load image elapsed time: \(Int((CACurrentMediaTime() - start) * 1000.0))ms")
+
+start = CACurrentMediaTime()
+let config = MLModelConfiguration()
+config.computeUnits = .all
+
+let yoloModel = try qrcode_detect_yolo(configuration: config)
+let vnModel = try VNCoreMLModel(for: yoloModel.model)
+print("load model elapsed time: \(Int((CACurrentMediaTime() - start) * 1000.0))ms")
+
+let imageWidth = CGFloat(cgImage.width)
+let imageHeight = CGFloat(cgImage.height)
+
+let request = VNCoreMLRequest(model: vnModel) { request, error in
+    print("prediction elapsed time: \(Int((CACurrentMediaTime() - start) * 1000.0))ms")
+    if let error {
+        print(error)
+        return
+    }
+    guard let results = request.results as? [VNRecognizedObjectObservation] else {
+        return
+    }
+//    print(results)
+    for result in results {
+        let rect = result.boundingBox
+        let pixelRect = CGRect(
+            x: rect.origin.x * imageWidth,
+            y: (1 - rect.origin.y - rect.size.height) * imageHeight,
+            width: rect.size.width * imageWidth,
+            height: rect.size.height * imageHeight
+        )
+
+        print("label=\(result.labels[0].identifier), score=\(result.confidence), boundingBox=\(pixelRect)")
+    }
+}
+
+request.imageCropAndScaleOption = .scaleFill
+let handler = VNImageRequestHandler(cgImage: cgImage)
+start = CACurrentMediaTime()
+try handler.perform([request])
+
+// ouput 
+load image elapsed time: 42ms
+load model elapsed time: 54ms
+prediction elapsed time: 34ms
+label=qrcode, score=0.9501953, boundingBox=(1351.87744140625, 108.558349609375, 514.8193359375, 492.44384765625)
+label=qrcode, score=0.93066406, boundingBox=(713.310791015625, 1513.4716796875, 592.99560546875, 588.173828125)
+label=qrcode, score=0.92871094, boundingBox=(2628.248046875, 174.35546875, 387.44921875, 365.8154296875)
+label=qrcode, score=0.92578125, boundingBox=(1513.56884765625, 910.400390625, 197.5380859375, 190.908203125)
+label=qrcode, score=0.9111328, boundingBox=(701.489013671875, 48.83056640625, 616.63916015625, 599.7607421875)
+label=qrcode, score=0.9042969, boundingBox=(319.760009765625, 425.95703125, 170.46240234375, 150.6298828125)
+label=qrcode, score=0.8203125, boundingBox=(348.742431640625, 1974.189453125, 116.31103515625, 99.31640625)
+label=qrcode, score=0.7675781, boundingBox=(349.69580078125, 1842.87109375, 116.6923828125, 97.109375)
+label=qrcode, score=0.31347656, boundingBox=(1976.1435546875, 843.91357421875, 520.158203125, 441.9580078125)
+```
+

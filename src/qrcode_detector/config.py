@@ -7,7 +7,7 @@ from dataclasses import dataclass
 class DetectionConfig:
     target_size: int = 1024
     confidence_floor: float = 0.15
-    business_threshold: float = 0.45
+    business_threshold: float = 0.30
     iou_threshold: float = 0.5
     corner_bonus: float = 0.08
     corner_ratio: float = 0.35
