@@ -14,6 +14,7 @@ if __package__ in {None, ""}:
     from qrcode_detector.download import download_images_from_csv
     from qrcode_detector.dataset import export_yolo_dataset, load_manifest, split_records
     from qrcode_detector.detector import QRCodeDetector
+    from qrcode_detector.server import create_app
     from qrcode_detector.source_split import SourceSplitConfig, split_training_sources
     from qrcode_detector.synthetic import SyntheticQRCodeConfig, compose_synthetic_qrcode, synthesize_directory
 else:
@@ -23,6 +24,7 @@ else:
     from .dataset import export_yolo_dataset, load_manifest, split_records
     from .detector import QRCodeDetector
     from .labelme import export_labelme_directory_to_yolo
+    from .server import create_app
     from .source_split import SourceSplitConfig, split_training_sources
     from .synthetic import SyntheticQRCodeConfig, compose_synthetic_qrcode, synthesize_directory
 if __package__ in {None, ""}:
@@ -155,6 +157,20 @@ def build_parser() -> argparse.ArgumentParser:
         default="dataset",
         help="Directory for the generated YOLO dataset.",
     )
+
+    serve_parser = subparsers.add_parser(
+        "serve-onnx",
+        help="Run a FastAPI HTTP server backed by ONNX Runtime.",
+    )
+    serve_parser.add_argument("--model", required=True, help="Path to the ONNX model file.")
+    serve_parser.add_argument("--host", default="0.0.0.0", help="Host to bind the HTTP server.")
+    serve_parser.add_argument("--port", type=int, default=8000, help="Port to bind the HTTP server.")
+    serve_parser.add_argument(
+        "--imgsz",
+        type=int,
+        default=None,
+        help="Inference image size. If omitted, uses DetectionConfig.target_size.",
+    )
     return parser
 
 
@@ -274,6 +290,20 @@ def main() -> None:
         # print(json.dumps(summary, ensure_ascii=True, indent=2))
         elapsed_ms = (time.perf_counter() - total_start_time) * 1000.0
         print(f"Build dataset from splits elapsed time: {elapsed_ms:.2f}ms")
+        return
+
+    if arguments.command == "serve-onnx":
+        try:
+            import uvicorn
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError(
+                "uvicorn is required for serving. Install with: pip install -e '.[server]'"
+            ) from exc
+        detection_config = DetectionConfig(
+            target_size=arguments.imgsz if arguments.imgsz is not None else DetectionConfig().target_size,
+        )
+        app = create_app(model_path=arguments.model, config=detection_config)
+        uvicorn.run(app, host=arguments.host, port=arguments.port)
         return
 
     raise RuntimeError(f"Unsupported command: {arguments.command}")

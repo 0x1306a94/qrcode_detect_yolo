@@ -44,6 +44,17 @@ python3 -m pip install -e ".[synthetic]"
 python3 -m pip install -e ".[dev]"
 ```
 
+安装 ONNX HTTP 服务依赖：
+
+```bash
+python3 -m pip install -e ".[server]"
+```
+
+说明：
+
+- `server` 依赖包含 `pillow-heif`，用于读取 `HEIC/HEIF` 图片。
+- 服务端会先解码大图再缩放到推理尺寸，因此可信内网场景下允许处理超大像素图片。
+
 ## Manifest 格式
 
 数据集切分和导出命令依赖 JSONL manifest 文件。每一行示例如下：
@@ -91,6 +102,46 @@ qrcode-detect synthesize \
 qrcode-detect detect \
   --model /abs/path/to/best.pt \
   --image /abs/path/to/input.jpg
+```
+
+启动 FastAPI + ONNX Runtime 服务：
+
+```bash
+python3 src/qrcode_detector/cli.py serve-onnx \
+  --model /abs/path/to/model.onnx \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --imgsz 512
+```
+
+接口：
+
+- `GET /health`
+- `POST /detect`
+
+`POST /detect` 支持三种输入方式，但一次请求只能传一种：
+
+- `multipart/form-data`，字段名 `file`
+- `application/json`，字段 `image_url`
+- `application/json`，字段 `image_base64`
+
+示例：
+
+```bash
+curl -X POST "http://127.0.0.1:8000/detect" \
+  -F "file=@/abs/path/to/input.jpg"
+```
+
+```bash
+curl -X POST "http://127.0.0.1:8000/detect" \
+  -H "Content-Type: application/json" \
+  -d '{"image_url":"https://example.com/input.jpg"}'
+```
+
+```bash
+curl -X POST "http://127.0.0.1:8000/detect" \
+  -H "Content-Type: application/json" \
+  -d '{"image_base64":"data:image/jpeg;base64,/9j/4AAQSkZJRg..."}'
 ```
 
 批量遍历目录，为每张图生成一个或多个合成二维码样本，并写出 Labelme 标注：
@@ -373,4 +424,3 @@ label=qrcode, score=0.8203125, rect=(174.3712158203125, 987.0947265625, 58.15551
 label=qrcode, score=0.7675781, rect=(174.847900390625, 921.435546875, 58.34619140625, 48.5546875)
 label=qrcode, score=0.31347656, rect=(988.07177734375, 421.956787109375, 260.0791015625, 220.97900390625)
 ```
-
